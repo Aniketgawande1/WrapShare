@@ -1,6 +1,4 @@
-I'll explain this WebSocket file-sharing code in simple WhatsApp-style language with real-life examples. Let's break it down into chunks (just like the code breaks files into chunks! 😊)
 
----
 
 ### 🏠 **Joining a Room (Like a WhatsApp Group)**
 ```javascript
