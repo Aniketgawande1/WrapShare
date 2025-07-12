@@ -43,6 +43,8 @@ exports.createRoom = async (req, res) => {
 exports.getRoomById = async (req, res) => {
   try {
     const { roomId } = req.params;
+    console.log('Getting room by ID:', roomId);
+    console.log('User requesting room:', req.user._id);
     
     const room = await Room.findOne({ roomId })
       .populate('createdBy', 'name email')
@@ -54,6 +56,8 @@ exports.getRoomById = async (req, res) => {
         },
         options: { sort: { createdAt: -1 } }
       });
+    
+    console.log('Room found:', room ? 'Yes' : 'No');
     
     if (!room) {
       return res.status(404).json({ message: 'Room not found' });
@@ -74,6 +78,7 @@ exports.getRoomById = async (req, res) => {
       });
     }
     
+    console.log('Sending room data:', { roomId: room.roomId, name: room.name });
     res.json(room);
   } catch (error) {
     console.error('Get room error:', error);

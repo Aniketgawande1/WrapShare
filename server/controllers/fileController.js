@@ -58,6 +58,8 @@ exports.uploadFile = (req, res) => {
       // Create file record
       const newFile = new File({
         name: req.file.originalname,
+        originalName: req.file.originalname,
+        filename: req.file.filename,
         size: req.file.size,
         mimeType: req.file.mimetype,
         path: req.file.path,
@@ -73,7 +75,7 @@ exports.uploadFile = (req, res) => {
       
       // Create audit log
       await AuditLog.create({
-        action: 'upload',
+        action: 'file_upload',
         user: req.user._id,
         room: room._id,
         file: newFile._id,
@@ -110,7 +112,7 @@ exports.downloadFile = async (req, res) => {
     
     // Create audit log
     await AuditLog.create({
-      action: 'download',
+      action: 'file_download',
       user: req.user._id,
       room: file.room,
       file: file._id,
@@ -154,7 +156,7 @@ exports.deleteFile = async (req, res) => {
     
     // Create audit log
     await AuditLog.create({
-      action: 'delete',
+      action: 'file_delete',
       user: req.user._id,
       room: file.room._id,
       file: file._id,

@@ -4,35 +4,78 @@ import { useParams } from 'react-router-dom';
 import io from 'socket.io-client';
 import QRCode from 'react-qr-code';
 import { toast } from 'react-toastify';
-import FileUploader from '../components/FileUploader';
+import FileUploader from '../components/Fileuploader';
 import FileList from '../components/FileList';
 import UserList from '../components/UserList';
+import Navbar from '../components/Navbar';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorPage from '../components/ErrorPage';
 import { useAuth } from '../context/AuthContext';
 
 export default function Room() {
   const { roomId } = useParams();
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   const [room, setRoom] = useState(null);
   const [users, setUsers] = useState([]);
   const [files, setFiles] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const socketRef = useRef();
 
+  console.log('Room component rendering:', { roomId, user });
+
   useEffect(() => {
+    if (!user) {
+      console.log('No user found, returning early');
+      return;
+    }
+
+    console.log('Fetching room data for:', roomId);
+    
+    // Get initial room data
+    const token = getToken();
+    if (!token) {
+      console.log('No token available for room fetch');
+      setError('Authentication required');
+      setLoading(false);
+      return;
+    }
+
+    fetch(`${import.meta.env.VITE_API_URL}/api/rooms/${roomId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => {
+        console.log('Room API response status:', res.status);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        console.log('Room data received:', data);
+        setRoom(data);
+        setFiles(data.files || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load room data:', err);
+        setError(err.message);
+        setLoading(false);
+        toast.error('Failed to load room data');
+      });
+
     // Connect to the Socket.IO server
-    socketRef.current = io(process.env.REACT_APP_API_URL, {
+    const socketToken = getToken();
+    socketRef.current = io(import.meta.env.VITE_API_URL, {
+      auth: {
+        token: socketToken
+      },
       query: { roomId, userId: user._id }
     });
-
-    // Get initial room data
-    fetch(`${process.env.REACT_APP_API_URL}/api/rooms/${roomId}`)
-      .then(res => res.json())
-      .then(data => {
-        setRoom(data);
-        setFiles(data.files);
-      })
-      .catch(err => toast.error('Failed to load room data'));
 
     // Socket event handlers
     socketRef.current.on('connect', () => {
@@ -80,11 +123,17 @@ export default function Room() {
     formData.append('roomId', roomId);
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/upload`, {
+      const token = getToken();
+      if (!token) {
+        toast.error('Authentication required for file upload');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/files/upload`, {
         method: 'POST',
         body: formData,
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -101,10 +150,16 @@ export default function Room() {
 
   const handleDeleteFile = async (fileId) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/${fileId}`, {
+      const token = getToken();
+      if (!token) {
+        toast.error('Authentication required for file deletion');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/files/${fileId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -123,31 +178,64 @@ export default function Room() {
     toast.success('Room link copied to clipboard');
   };
 
-  if (!room) {
-    return <div className="flex h-screen justify-center items-center">Loading room...</div>;
+  if (loading) {
+    return <LoadingSpinner message="Loading room..." />;
   }
 
+  if (error) {
+    return (
+      <ErrorPage 
+        title="Error loading room"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
+  if (!room) {
+    return (
+      <ErrorPage 
+        title="Room not found"
+        message="The room you're looking for doesn't exist or you don't have access to it."
+        showRetry={false}
+      />
+    );
+  }
+
+  // Define navbar actions
+  const navbarActions = [
+    {
+      label: 'Share Link',
+      onClick: generateShareLink,
+      className: 'bg-blue-600 hover:bg-blue-700 text-white'
+    },
+    {
+      label: showQRCode ? 'Hide QR' : 'Show QR',
+      onClick: () => setShowQRCode(!showQRCode),
+      className: 'bg-gray-600 hover:bg-gray-700 text-white border border-gray-500'
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="bg-black text-white px-6 py-4">
-        <div className="container mx-auto flex flex-wrap justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold">Room: {room.name || roomId}</h1>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar 
+        title={`Room: ${room.name || roomId}`}
+        showBack={true}
+        backTo="/dashboard"
+        actions={navbarActions}
+      />
+      
+      {/* Connection Status */}
+      <div className="bg-white border-b border-gray-200 px-6 py-2">
+        <div className="container mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className={`text-sm font-medium ${isConnected ? 'text-green-700' : 'text-red-700'}`}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
           </div>
-          <div className="flex space-x-4 mt-2 sm:mt-0">
-            <button 
-              onClick={generateShareLink}
-              className="bg-white text-black px-4 py-2 rounded hover:bg-gray-200"
-            >
-              Share Link
-            </button>
-            <button 
-              onClick={() => setShowQRCode(!showQRCode)}
-              className="bg-transparent border border-white text-white px-4 py-2 rounded hover:bg-white/10"
-            >
-              {showQRCode ? 'Hide QR' : 'Show QR'}
-            </button>
+          <div className="text-sm text-gray-500">
+            {users.length} user{users.length !== 1 ? 's' : ''} online
           </div>
         </div>
       </div>

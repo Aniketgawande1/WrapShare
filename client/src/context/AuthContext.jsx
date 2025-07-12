@@ -1,20 +1,38 @@
 // client/src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+
+  // Helper function to get current token
+  const getToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // Helper function to check if token is valid
+  const isTokenValid = async (token) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
+          console.log('Checking authentication with token...');
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -22,11 +40,14 @@ export function AuthProvider({ children }) {
           
           if (response.ok) {
             const userData = await response.json();
+            console.log('Authentication successful:', userData);
             setUser(userData);
           } else {
+            console.log('Authentication failed, removing token');
             localStorage.removeItem('token');
           }
         } catch (error) {
+          console.error('Authentication check error:', error);
           localStorage.removeItem('token');
         }
       }
@@ -38,7 +59,8 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
+      console.log('Attempting login for:', email);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -46,22 +68,29 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ email, password })
       });
       
+      console.log('Login response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Login failed');
+        const errorData = await response.json();
+        console.error('Login failed:', errorData);
+        throw new Error(errorData.message || 'Login failed');
       }
       
       const data = await response.json();
+      console.log('Login successful, received data:', { user: data.user, hasToken: !!data.token });
+      
       localStorage.setItem('token', data.token);
       setUser(data.user);
       return true;
     } catch (error) {
+      console.error('Login error:', error);
       return false;
     }
   };
 
   const register = async (name, email, password) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -85,11 +114,18 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
-    navigate('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      register, 
+      logout, 
+      loading, 
+      getToken, 
+      isTokenValid 
+    }}>
       {children}
     </AuthContext.Provider>
   );
