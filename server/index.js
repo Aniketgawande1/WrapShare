@@ -48,6 +48,9 @@ const io = new Server(server, {
 // Socket handler
 socketHandler(io);
 
+// Make io instance globally available
+global.io = io;
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

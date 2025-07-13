@@ -46,6 +46,12 @@ exports.getRoomById = async (req, res) => {
     console.log('Getting room by ID:', roomId);
     console.log('User requesting room:', req.user._id);
     
+    // Basic validation for room ID
+    if (!roomId || roomId.length < 3 || roomId === 'room') {
+      console.log('Invalid room ID provided:', roomId);
+      return res.status(400).json({ message: 'Invalid room ID' });
+    }
+    
     const room = await Room.findOne({ roomId })
       .populate('createdBy', 'name email')
       .populate({

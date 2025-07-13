@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 export default function FileUploader({ onUpload }) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleDragOver = (e) => {
     e.preventDefault();

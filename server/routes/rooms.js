@@ -14,6 +14,7 @@ const { protect, admin } = require('../middleware/auth');
 router.post('/', protect, createRoom);
 router.get('/my-rooms', protect, getUserRooms);
 router.get('/:roomId', protect, getRoomById);
+router.get('/:roomId/activities', protect, getRoomAuditLogs);
 router.put('/:roomId', protect, updateRoom);
 router.get('/:roomId/audit-logs', protect, getRoomAuditLogs);
 

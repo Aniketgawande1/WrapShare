@@ -79,6 +79,28 @@ module.exports = (io) => {
       }
     });
 
+    // Handle chat messages
+    socket.on('chat-message', (message) => {
+      if (socket.roomId) {
+        // Broadcast to all users in the room including sender
+        io.to(socket.roomId).emit('chat-message', {
+          ...message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle typing indicators
+    socket.on('typing', (data) => {
+      if (socket.roomId) {
+        socket.to(socket.roomId).emit('user-typing', {
+          userId: socket.user._id,
+          userName: socket.user.name,
+          isTyping: data.isTyping
+        });
+      }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
       console.log(`User ${socket.user.name} disconnected`);

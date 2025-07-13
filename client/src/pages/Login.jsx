@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import PasswordManager from '../components/PasswordManager';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ export default function Login() {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [showPasswordManager, setShowPasswordManager] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -104,6 +106,16 @@ export default function Login() {
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
+
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordManager(true)}
+                  className="text-sm text-blue-600 hover:text-blue-500"
+                >
+                  Forgot your password?
+                </button>
+              </div>
             </div>
           </form>
 
@@ -128,6 +140,12 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* Password Manager Modal */}
+      <PasswordManager 
+        isOpen={showPasswordManager} 
+        onClose={() => setShowPasswordManager(false)} 
+      />
     </div>
   );
 }

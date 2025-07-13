@@ -6,7 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const socketHandler = require('../socket/socketHandler');
 
 // Configure multer storage
 const storage = multer.diskStorage({
@@ -86,8 +85,10 @@ exports.uploadFile = (req, res) => {
       // Populate user info for socket
       const fileWithUser = await File.findById(newFile._id).populate('uploadedBy', 'name email');
       
-      // Notify all room members about the new file
-      socketHandler().notifyFileUpload(roomId, fileWithUser);
+      // Notify all room members about the new file via socket
+      if (global.io) {
+        global.io.to(roomId).emit('file-uploaded', fileWithUser);
+      }
       
       res.status(201).json({ 
         message: 'File uploaded successfully',
@@ -138,21 +139,38 @@ exports.deleteFile = async (req, res) => {
       return res.status(404).json({ message: 'File not found' });
     }
     
+    console.log('Attempting to delete file:', file.name);
+    console.log('User requesting deletion:', req.user._id);
+    console.log('File uploader:', file.uploadedBy._id);
+    console.log('User role:', req.user.role);
+    
     // Check permission (only file uploader or admin can delete)
     const isAdmin = req.user.role === 'admin';
     const isUploader = file.uploadedBy._id.toString() === req.user._id.toString();
     
     if (!isAdmin && !isUploader) {
+      console.log('Permission denied for file deletion');
       return res.status(403).json({ message: 'Permission denied' });
     }
     
-    // Delete file from filesystem
-    fs.unlinkSync(file.path);
+    // Delete file from filesystem (with error handling)
+    try {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+        console.log('File deleted from filesystem:', file.path);
+      } else {
+        console.log('File not found in filesystem:', file.path);
+      }
+    } catch (fsError) {
+      console.error('Filesystem deletion error:', fsError);
+      // Continue with database deletion even if file system deletion fails
+    }
     
     // Remove file from room
     await Room.findByIdAndUpdate(file.room._id, {
       $pull: { files: file._id }
     });
+    console.log('File removed from room:', file.room._id);
     
     // Create audit log
     await AuditLog.create({
@@ -163,17 +181,22 @@ exports.deleteFile = async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
+    console.log('Audit log created for file deletion');
     
-    // Delete file from database
-    await file.remove();
+    // Delete file from database (using deleteOne instead of remove)
+    await File.findByIdAndDelete(fileId);
+    console.log('File deleted from database:', fileId);
     
-    // Notify room members
-    socketHandler().notifyFileDelete(file.room.roomId, fileId);
+    // Notify room members via socket
+    if (global.io) {
+      global.io.to(file.room.roomId).emit('file-deleted', fileId);
+      console.log('Socket notification sent for file deletion');
+    }
     
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
     console.error('Delete error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
