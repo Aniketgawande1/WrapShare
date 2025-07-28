@@ -84,7 +84,11 @@ export default function Room() {
       auth: {
         token: socketToken
       },
-      query: { roomId, userId: user._id }
+      query: { roomId, userId: user._id },
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
     });
 
     // Socket event handlers
